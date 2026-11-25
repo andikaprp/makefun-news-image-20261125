@@ -18,7 +18,7 @@ FONT_DIR = "/usr/share/fonts/truetype/noto/"
 
 # Master Palette (DESIGN-GEMINI.md §2A)
 PAPER = "#F8F4EC"
-PAPER_TINT = "#ECE6D8"
+HEADER_BAND_BG = "#FAF7F0"
 INK_PRIMARY = "#111111"
 INK_HEADLINE = "#0E0E0E"
 INK_BODY = "#1F1D1A"
@@ -190,7 +190,7 @@ def render_page(data_path, out_path):
     # =========================================================================
     # ZONE 3: UTC TIMELINE STRIP (y = 84..122)
     # =========================================================================
-    draw.rectangle([16, 84, 1008, 121], fill=PAPER_TINT)
+    draw.rectangle([16, 84, 1008, 121], fill=HEADER_BAND_BG)
     # Left crimson pill
     draw.rounded_rectangle([16, 88, 78, 117], radius=2, fill=ACCENT_CRIMSON)
     draw_centered_text(draw, 47, 97, "THE DAY", F("NotoSans-Bold.ttf", 8.8), "#FFFFFF")
@@ -218,6 +218,7 @@ def render_page(data_path, out_path):
     # =========================================================================
     # ZONE 4: STAT BAND — THE DAY IN NUMBERS (y = 122..163)
     # =========================================================================
+    draw.rectangle([16, 122, 1008, 162], fill=HEADER_BAND_BG)
     draw.rounded_rectangle([16, 126, 78, 158], radius=2, fill=INK_PRIMARY)
     draw_centered_text(draw, 47, 134.5, "THE DAY", F("NotoSans-CondensedBold.ttf", 8.2), "#FFFFFF")
     draw_centered_text(draw, 47, 143, "IN", F("NotoSans-CondensedBold.ttf", 7.6), "#D8D0C2")
@@ -243,32 +244,35 @@ def render_page(data_path, out_path):
     draw.line([(16, 162), (1008, 162)], fill=RULE_HAIRLINE, width=1)
 
     # =========================================================================
-    # ZONE 5: LEAD ROW — CARDS 1..3 (y = 166..383) — NO OUTER CARD BOXES!
+    # ZONE 5: LEAD ROW — CARDS 1..3 (y = 165..383) — NO OUTER CARD BOXES!
     # =========================================================================
-    lead_w, lead_panel_h = 322, 104
+    lead_w, lead_panel_h = 322, 124
     lead_xs = [16, 351, 686]
     f_lead_k = F("NotoSans-Bold.ttf", 10.2)
     f_lead_h = F("NotoSerif-ExtraBold.ttf", 19.5)
-    f_lead_s = F("NotoSans-Regular.ttf", 11.5)
-    f_lead_sb = F("NotoSans-SemiBold.ttf", 11.5)
+    f_lead_s = F("NotoSans-SemiCondensed.ttf", 11.5)
+    f_lead_sb = F("NotoSans-SemiCondensedSemiBold.ttf", 11.5)
     f_b1 = F("NotoSans-Bold.ttf", 9.2)
     f_b2 = F("NotoSans-CondensedBold.ttf", 8.6)
 
     for idx, card in enumerate(data["leads"]):
         x0 = lead_xs[idx]
         reg = REGION_COLORS[card["region"]]
-        # Panel (322 x 104 -> 1.93x height / 3.30x area over 188 x 54 small panels)
+        # Panel (322 x 124 -> 1.91x height / 3.27x area over 188 x 65 small panels)
         p_img = PANEL_FUNCS[card["num"]](lead_w, lead_panel_h)
         img.paste(p_img, (x0, 165))
 
-        # Kicker row y = 271..286
-        draw_badge_circle(draw, x0 + 7.5, 279.0, 15, card["num"], reg["fill"], f_b1, f_b2)
-        draw.text((x0 + 19, 272.5), card["kicker"], fill=reg["ink"], font=f_lead_k)
-        draw_conf_pill(draw, x0 + lead_w, 272.5, card["confidence"], label=card["pill_text"], font_sz=7.6, pad_x=4.5, h=13)
+        # Kicker row y = 291..306
+        ky_lead = 165 + lead_panel_h + 2
+        draw_badge_circle(draw, x0 + 7.5, ky_lead + 8.0, 15, card["num"], reg["fill"], f_b1, f_b2)
+        draw.text((x0 + 19, ky_lead + 1.5), card["kicker"], fill=reg["ink"], font=f_lead_k)
+        draw_conf_pill(draw, x0 + lead_w, ky_lead + 1.5, card["confidence"], label=card["pill_text"], font_sz=7.6, pad_x=4.5, h=13)
 
-        # Headline (19.5px ExtraBold Serif, 3 lines max; top bearing ~7px)
-        hy = 284.5
+        # Headline (19.5px ExtraBold Serif, strictly 2 lines; top bearing ~7px)
+        hy = ky_lead + 13.5
         h_lines = wrap_text(card["headline"], f_lead_h, lead_w)
+        if len(h_lines) != 2:
+            overflows.append(f"Lead {card['num']} headline lines={len(h_lines)} != 2")
         hlh = 20.0
         h_vis_bottom = hy
         for line in h_lines:
@@ -280,14 +284,14 @@ def render_page(data_path, out_path):
                 h_vis_bottom = max(h_vis_bottom, hy + bb[3])
             hy += hlh
 
-        # Sub-line (11.5px Sans, bold named source)
+        # Sub-line (11.5px SemiCondensed Sans, <= 2 lines, bold named source)
         body_part, src_part = split_source_tail(card["sub"])
         segs = [(body_part, f_lead_s, INK_BODY)]
         if src_part:
             segs.append((src_part, f_lead_sb, INK_PRIMARY))
-        end_y, _, lw = draw_rich_lines(draw, x0, h_vis_bottom + 2.5, segs, lead_w, 13.2)
-        if end_y > 382.5 or lw > lead_w:
-            overflows.append(f"Lead {card['num']}: end_y={end_y:.1f} > 382.5, lw={lw:.1f}")
+        end_y, s_lines, lw = draw_rich_lines(draw, x0, h_vis_bottom + 2.5, segs, lead_w, 13.0)
+        if s_lines > 2 or end_y > 382.5 or lw > lead_w:
+            overflows.append(f"Lead {card['num']}: s_lines={s_lines}, end_y={end_y:.1f} > 382.5, lw={lw:.1f}")
 
     # Rule between Row 1 and Row 2
     draw.line([(16, 385), (1008, 385)], fill=RULE_HAIRLINE, width=1)
@@ -295,12 +299,14 @@ def render_page(data_path, out_path):
     # =========================================================================
     # ZONE 6a & 6b: SMALL CARDS 4..8 (y=390..534) & 9..13 (y=541..685)
     # =========================================================================
-    sm_w, sm_panel_h = 188, 54
+    sm_w, sm_panel_h = 188, 65
     sm_xs = [16, 217, 418, 619, 820]
     f_sm_k = F("NotoSans-CondensedBold.ttf", 9.2)
-    f_sm_h = F("NotoSerif-CondensedExtraBold.ttf", 14.5)
-    f_sm_s = F("NotoSans-CondensedMedium.ttf", 10.2)
-    f_sm_sb = F("NotoSans-CondensedBold.ttf", 10.2)
+    f_sm_h = F("NotoSerif-CondensedExtraBold.ttf", 14.2)
+    f_sm_s = F("NotoSans-CondensedMedium.ttf", 9.6)
+    f_sm_sb = F("NotoSans-CondensedBold.ttf", 9.6)
+    f_sm_xs = F("NotoSans-ExtraCondensedMedium.ttf", 9.6)
+    f_sm_xsb = F("NotoSans-ExtraCondensedBold.ttf", 9.6)
     f_sb1 = F("NotoSans-Bold.ttf", 8.2)
     f_sb2 = F("NotoSans-CondensedBold.ttf", 7.8)
 
@@ -312,7 +318,7 @@ def render_page(data_path, out_path):
         y_limit = 534 if row == 0 else 685
         reg = REGION_COLORS[card["region"]]
 
-        # Panel (188 x 54) + confidence pill tucked 3px inside top-right corner
+        # Panel (188 x 65) + confidence pill tucked 3px inside top-right corner
         p_img = PANEL_FUNCS[card["num"]](sm_w, sm_panel_h)
         img.paste(p_img, (x0, y_top))
         draw_conf_pill(draw, x0 + sm_w - 3, y_top + 3, card["confidence"], label=card["confidence"], font_sz=6.8, pad_x=3.5, h=11)
@@ -322,9 +328,11 @@ def render_page(data_path, out_path):
         draw_badge_circle(draw, x0 + 6.5, ky + 6.5, 13, card["num"], reg["fill"], f_sb1, f_sb2)
         draw.text((x0 + 16, ky + 1.0), card["kicker"], fill=reg["ink"], font=f_sm_k)
 
-        # Headline (14.5px CondensedExtraBold Serif, 2–3 lines; top bearing ~6px)
+        # Headline (14.5px CondensedExtraBold Serif, strictly 2 lines; top bearing ~6px)
         hy = ky + 11.2
         h_lines = wrap_text(card["headline"], f_sm_h, sm_w)
+        if len(h_lines) != 2:
+            overflows.append(f"Card {card['num']} headline lines={len(h_lines)} != 2")
         hlh = 14.8
         h_vis_bottom = hy
         for line in h_lines:
@@ -336,14 +344,29 @@ def render_page(data_path, out_path):
                 h_vis_bottom = max(h_vis_bottom, hy + bb[3])
             hy += hlh
 
-        # Sub-line (10.2px CondensedMedium + Bold source, 2 lines)
+        # Sub-line (9.6px CondensedMedium + Bold source, <= 2 lines; fallback to ExtraCondensed 9.6px if needed)
         body_part, src_part = split_source_tail(card["sub"])
-        segs = [(body_part, f_sm_s, INK_BODY)]
+        # Measure wrap count with standard CondensedMedium first
+        def _count_rich_lines(fb, fs):
+            toks = [(w, fb) for w in body_part.split()] + ([(w, fs) for w in src_part.split()] if src_part else [])
+            nlines, cw = 1, 0.0
+            for w, fnt in toks:
+                sp = fnt.getlength(" ") if cw > 0 else 0.0
+                wl = fnt.getlength(w)
+                if cw > 0 and cw + sp + wl > sm_w:
+                    nlines += 1
+                    cw = wl
+                else:
+                    cw += sp + wl
+            return nlines
+
+        use_f_s, use_f_sb = (f_sm_s, f_sm_sb) if _count_rich_lines(f_sm_s, f_sm_sb) <= 2 else (f_sm_xs, f_sm_xsb)
+        segs = [(body_part, use_f_s, INK_BODY)]
         if src_part:
-            segs.append((src_part, f_sm_sb, INK_PRIMARY))
-        end_y, _, lw = draw_rich_lines(draw, x0, h_vis_bottom + 2.2, segs, sm_w, 11.4)
-        if end_y > y_limit or lw > sm_w:
-            overflows.append(f"Card {card['num']}: end_y={end_y:.1f} > {y_limit}, lw={lw:.1f}")
+            segs.append((src_part, use_f_sb, INK_PRIMARY))
+        end_y, s_lines, lw = draw_rich_lines(draw, x0, h_vis_bottom + 2.2, segs, sm_w, 11.0)
+        if s_lines > 2 or end_y > y_limit or lw > sm_w:
+            overflows.append(f"Card {card['num']}: s_lines={s_lines}, end_y={end_y:.1f} > {y_limit}, lw={lw:.1f}")
 
     # Hairline between Row 2 and Row 3
     draw.line([(16, 537), (1008, 537)], fill=RULE_SUBTLE, width=1)
